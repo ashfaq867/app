@@ -1,79 +1,75 @@
-
+# Import necessary libraries
 import streamlit as st
-import pandas as pd
-import numpy as np
-import subprocess  # <-- Import subprocess module here
+import pyaudio
+import wave
+import speech_recognition as sr
 
-# Every good app has a title, so let's add one:
-st.title('hello')
+# Create a function for recording audio
+def record_audio(filename, seconds):
+    CHUNK = 1024
+    FORMAT = pyaudio.paInt16
+    CHANNELS = 2
+    RATE = 44100
 
-st.title('Hello World!')
-st.write('This is a simple text')
+    p = pyaudio.PyAudio()
 
-st.title("Hello")
-st.write("This is a simple test")
-# Expander section
-with st.expander("About"):
-    st.write("""Trying to add a data table, chart, sidebar button with
-             ballons, an image, text input & exploring tabs!""")
+    stream = p.open(format=FORMAT,
+                    channels=CHANNELS,
+                    rate=RATE,
+                    input=True,
+                    frames_per_buffer=CHUNK)
 
-# Sidebar section
-with st.sidebar:
-    st.subheader('This is a Sidebar')
-    st.write('Button with Balloons 🎈')
-    if st.button('Click me!✨'):
-        st.balloons()
-    else:
-        st.write(' ')
+    print("Recording...")
 
-# Dataframe and Chart display section
-st.subheader('Interactive Data Table')
-df = pd.DataFrame(
-    np.random.randn(50, 3),  # generates random numeric values!
-    columns=["a", "b", "c"])
-st.dataframe(df)
+    frames = []
 
-st.subheader('Bar Chart 📊')
-st.bar_chart(df)
+    for i in range(0, int(RATE / CHUNK * seconds)):
+        data = stream.read(CHUNK)
+        frames.append(data)
 
-# Image upload and text input section
-st.subheader('An Image')
-st.image('https://www.scoopbyte.com/wp-content/uploads/2019/12/tom-and-jerry.jpg')
+    print("Finished recording.")
 
-st.subheader('Text Input')
-greet = st.text_input('Write your name, please!')
-st.write('👋 Hey!', greet)
+    stream.stop_stream()
+    stream.close()
+    p.terminate()
 
-# Tabs section
-st.subheader('Tabs')
-tab1, tab2 = st.tabs(["TAB 1", "TAB 2"])
+    wf = wave.open(filename, 'wb')
+    wf.setnchannels(CHANNELS)
+    wf.setsampwidth(p.get_sample_size(FORMAT))
+    wf.setframerate(RATE)
+    wf.writeframes(b''.join(frames))
+    wf.close()
 
-with tab1:
-    st.write('WOW!')
-    st.image("https://i.gifer.com/DJR3.gif", width=400)
-
-with tab2:
-    st.write('Do you like ice cream? 🍨')
-    agree = st.checkbox('Yes! I love it')
-    disagree = st.checkbox("Nah! 😅")
-    if agree:
-        st.write('Even I love it 🤤')
-    if disagree:
-        st.write('You are boring 😒')
-
-
+# Main Streamlit app
 def main():
-    st.title("Personalized Greeting App")
-    name = st.text_input("Enter your name:")
+    st.title("Speech-to-Text App")
 
-    if name:
-        st.write(f"Hello, {name}! Welcome to your personalized Streamlit app.")
+    # Record button
+    if st.button("Record"):
+        st.info("Recording started. Click 'Stop' when done.")
+        filename = "audio_recording.wav"
+        record_audio(filename, seconds=5)
+        st.success("Recording saved as audio_recording.wav")
 
-    # Button to run another Python script
-    if st.button("Run task3.py"):
-        st.write("Running task3.py as a separate process...")
-        subprocess.run(["python", "task3.py"])
+    # Stop button (placeholder, doesn't do anything)
+    if st.button("Stop"):
+        st.info("Recording stopped.")
 
+    # Transcription button
+    if st.button("Transcribe"):
+        st.info("Transcribing...")
+        recognizer = sr.Recognizer()
+        audio_file = "audio_recording.wav"
+        with sr.AudioFile(audio_file) as source:
+            audio = recognizer.record(source)
+        try:
+            transcription = recognizer.recognize_google(audio)
+            st.write("Transcription:")
+            st.write(transcription)
+        except sr.UnknownValueError:
+            st.error("Speech Recognition could not understand the audio.")
+        except sr.RequestError as e:
+            st.error(f"Could not request results from Google Speech Recognition service; {e}")
 
 if __name__ == "__main__":
     main()
